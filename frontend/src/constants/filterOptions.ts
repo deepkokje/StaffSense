@@ -14,3 +14,17 @@ export const DEPARTMENT_OPTIONS = [
 export const LEVEL_OPTIONS = [1, 2, 3, 4, 5, 6];
 export const STATUS_OPTIONS: EmployeeStatus[] = ["ACTIVE", "ON_LEAVE", "TERMINATED"];
 export const GENDER_OPTIONS: Gender[] = ["FEMALE", "MALE", "OTHER", "UNDISCLOSED"];
+export const TITLE_OPTIONS = [
+  "Software Engineer",
+  "QA Engineer",
+  "Data Analyst",
+  "Data Scientist",
+  "Product Manager",
+  "Designer",
+  "HR Specialist",
+  "Recruiter",
+  "Accountant",
+  "Financial Analyst",
+  "Sales Executive",
+  "Customer Support Specialist",
+];

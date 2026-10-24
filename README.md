@@ -3,7 +3,7 @@
 A bare-bones salary management monorepo using FastAPI, SQLAlchemy and SQLite
 for the backend, and React, TypeScript, Ant Design and TanStack React Query
 for the frontend.
-No salary features or database tables are implemented yet.
+Includes an employee directory and peer-group salary benchmarks.
 
 ## Backend
 
@@ -29,7 +29,20 @@ Settings are read from environment variables, with these defaults:
 | `STAFFSENSE_APP_NAME` | `StaffSense` |
 | `STAFFSENSE_DATABASE_URL` | `sqlite:///./staffsense.db` |
 
-The database engine and session factory are configured, but no tables are created.
+Create tables and load synthetic employees before querying a new database:
+
+```sh
+python -m scripts.seed
+```
+
+`GET /insights/benchmarks` groups ACTIVE and ON_LEAVE employees by title, level
+and country. Repeatable `country`, `title` and `level` parameters narrow the groups.
+Set `include_insufficient=false` to hide groups with fewer than five employees.
+Each item has a `key` (`title`, `level`, `country`), `currency`, `headcount`,
+`insufficient_data` and nullable `stats` (`min`, `p25`, `median`, `p75`, `max`).
+Statistics use local-currency integer minor units and integer-only interpolated
+percentiles with half-even rounding. Small groups expose no salary statistics.
+Every peer group must use a single currency; incompatible currencies are rejected.
 
 ## Frontend
 
@@ -45,14 +58,16 @@ npm run dev
 Open the URL printed by Vite (normally http://localhost:5173).
 For a type-checked production build, run `npm run build`.
 
-TanStack React Query is available throughout the app through `AppProviders`,
-which keeps one query client per mounted application using the library defaults.
-Future API hooks can use `useQuery` and `useMutation` for server-state management.
-No API calls or queries are implemented yet.
+The sidebar links to `/employees` and `/insights/benchmarks`; `/` redirects to
+`/employees`. Benchmark filters apply immediately, and the table paginates the
+returned groups locally. TanStack React Query manages all server data.
+Set `VITE_API_BASE_URL` before starting or building the UI (default
+`http://localhost:8000`). Production hosts must serve `index.html` for frontend
+routes so direct links and refreshes work.
 
 ## Architecture
 
 Backend dependencies flow from routers to services to repositories to models.
 Routers handle HTTP only; services contain pure business functions, and only
 repositories access the database. React components contain no business logic.
-Future monetary values must use integer minor units and a currency code, never floats.
+Monetary values use integer minor units and a currency code, never floats.

@@ -63,3 +63,30 @@ export interface EmployeeQuery extends Record<string, EmployeeQueryValue> {
   sort_by: SortField;
   sort_dir: SortDirection;
 }
+
+export interface BenchmarkStats {
+  min: number;
+  p25: number;
+  median: number;
+  p75: number;
+  max: number;
+}
+
+export interface PeerGroupBenchmark {
+  key: { title: string; level: number; country: string };
+  currency: string;
+  headcount: number;
+  stats: BenchmarkStats | null;
+  insufficient_data: boolean;
+}
+
+export interface BenchmarksResponse {
+  items: PeerGroupBenchmark[];
+}
+
+export interface BenchmarksQuery {
+  country?: readonly string[];
+  title?: readonly string[];
+  level?: readonly number[];
+  include_insufficient: boolean;
+}

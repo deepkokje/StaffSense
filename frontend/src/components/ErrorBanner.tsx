@@ -1,12 +1,18 @@
 import { Alert, Button } from "antd";
 
 interface ErrorBannerProps {
+  title?: string;
   message: string;
   onRetry: () => void;
   retrying: boolean;
 }
 
-export default function ErrorBanner({ message, onRetry, retrying }: ErrorBannerProps) {
+export default function ErrorBanner({
+  title = "Unable to load employees",
+  message,
+  onRetry,
+  retrying,
+}: ErrorBannerProps) {
   return (
     <Alert
       action={
@@ -14,7 +20,7 @@ export default function ErrorBanner({ message, onRetry, retrying }: ErrorBannerP
           Retry
         </Button>
       }
-      message="Unable to load employees"
+      message={title}
       description={message}
       showIcon
       type="error"
