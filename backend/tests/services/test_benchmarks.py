@@ -6,7 +6,10 @@ from app.services.benchmarks import BenchmarkStats, compute_benchmarks
 
 def make_rows(count: int = 5, country: str = "US") -> list[SalaryRow]:
     return [
-        SalaryRow(index, "Engineer", 2, country, "USD", index * 10) for index in range(1, count + 1)
+        SalaryRow(
+            index, "Engineer", 2, country, "USD", index * 10, f"Employee {index}", "Engineering"
+        )
+        for index in range(1, count + 1)
     ]
 
 
@@ -28,10 +31,10 @@ def test_four_people_have_no_stats() -> None:
 
 def test_benchmarks_are_sorted_by_country_title_and_level() -> None:
     rows = [
-        SalaryRow(1, "Engineer", 3, "US", "USD", 10),
-        SalaryRow(2, "Engineer", 2, "US", "USD", 20),
-        SalaryRow(3, "Designer", 2, "US", "USD", 30),
-        SalaryRow(4, "Engineer", 2, "JP", "JPY", 40),
+        SalaryRow(1, "Engineer", 3, "US", "USD", 10, "One", "Engineering"),
+        SalaryRow(2, "Engineer", 2, "US", "USD", 20, "Two", "Engineering"),
+        SalaryRow(3, "Designer", 2, "US", "USD", 30, "Three", "Product"),
+        SalaryRow(4, "Engineer", 2, "JP", "JPY", 40, "Four", "Engineering"),
     ]
     forward = compute_benchmarks(rows)
     assert forward == compute_benchmarks(list(reversed(rows)))
@@ -49,6 +52,6 @@ def test_empty_input_has_no_benchmarks() -> None:
 
 def test_mixed_currencies_in_one_peer_group_are_rejected() -> None:
     rows = make_rows()
-    rows.append(SalaryRow(6, "Engineer", 2, "US", "EUR", 60))
+    rows.append(SalaryRow(6, "Engineer", 2, "US", "EUR", 60, "Six", "Engineering"))
     with pytest.raises(ValueError, match="currency"):
         compute_benchmarks(rows)

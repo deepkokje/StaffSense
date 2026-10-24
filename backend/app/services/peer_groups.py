@@ -2,6 +2,18 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Protocol
 
+MIN_PEER_GROUP_SIZE = 5
+
+
+class CurrencyRow(Protocol):
+    @property
+    def currency(self) -> str: ...
+
+
+def validate_peer_currency(rows: Iterable[CurrencyRow]) -> None:
+    if len({row.currency for row in rows}) != 1:
+        raise ValueError("A peer group must have exactly one currency.")
+
 
 class PeerGroupRow(Protocol):
     @property

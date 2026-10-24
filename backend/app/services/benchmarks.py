@@ -2,15 +2,19 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
-from app.services.peer_groups import PeerGroupKey, PeerGroupRow, group_by_peer_group
+from app.services.peer_groups import (
+    MIN_PEER_GROUP_SIZE,
+    PeerGroupKey,
+    PeerGroupRow,
+    group_by_peer_group,
+    validate_peer_currency,
+)
 from app.services.statistics import (
     LOWER_QUARTILE_PERCENT,
     UPPER_QUARTILE_PERCENT,
     median,
     percentile,
 )
-
-MIN_PEER_GROUP_SIZE = 5
 
 
 class BenchmarkSalaryRow(PeerGroupRow, Protocol):
@@ -53,9 +57,7 @@ def compute_benchmarks(rows: Iterable[BenchmarkSalaryRow]) -> list[PeerGroupBenc
     groups = group_by_peer_group(rows)
     for key in sorted(groups, key=lambda key: (key.country, key.title, key.level)):
         group = groups[key]
-        currencies = {row.currency for row in group}
-        if len(currencies) != 1:
-            raise ValueError(f"Peer group {key} must have exactly one currency.")
+        validate_peer_currency(group)
         insufficient_data = len(group) < MIN_PEER_GROUP_SIZE
         stats = None
         if not insufficient_data:

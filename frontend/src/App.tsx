@@ -2,6 +2,7 @@ import { Layout, Menu } from "antd";
 import { Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { NAVIGATION_ITEMS } from "./constants/navigation";
+import AttentionPage from "./pages/AttentionPage";
 import BenchmarksPage from "./pages/BenchmarksPage";
 import EmployeesPage from "./pages/EmployeesPage";
 
@@ -32,6 +33,7 @@ export default function App() {
             <Route path="/" element={<Navigate to="/employees" replace />} />
             <Route path="/employees" element={<EmployeesPage />} />
             <Route path="/insights/benchmarks" element={<BenchmarksPage />} />
+            <Route path="/insights/attention" element={<AttentionPage />} />
           </Routes>
         </Layout.Content>
       </Layout>

@@ -6,17 +6,22 @@ import { beforeEach, expect, test, vi } from "vitest";
 
 import App from "./App";
 import { NAVIGATION_ITEMS } from "./constants/navigation";
+import { makeBandsResponse } from "./test/attentionFactories";
 import { renderWithQueryClient } from "./test/renderWithQueryClient";
 
 beforeEach(() => {
   vi.stubGlobal(
     "fetch",
-    vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({ items: [], total: 0, page: 1, page_size: 25, total_pages: 0 }),
+    vi.fn((input: RequestInfo | URL) => {
+      const path = new URL(String(input)).pathname;
+      const body = path === "/insights/bands"
+        ? makeBandsResponse({ items: [], total: 0 })
+        : { items: [], total: 0, page: 1, page_size: 25, total_pages: 0 };
+      return Promise.resolve(new Response(
+        JSON.stringify(body),
         { status: 200 },
-      ),
-    ),
+      ));
+    }),
   );
 });
 
@@ -45,6 +50,18 @@ test("clicking Benchmarks navigates to its page and selects its menu item", asyn
   await userEvent.click(screen.getByRole("link", { name: "Benchmarks" }));
   expect(screen.getByRole("heading", { name: "Benchmarks" })).toBeInTheDocument();
   expect(screen.getByRole("menuitem", { name: "Benchmarks" })).toHaveClass(
+    "ant-menu-item-selected",
+  );
+});
+
+test("clicking Needs attention opens the band compliance tab", async () => {
+  renderApp("/employees");
+  await userEvent.click(screen.getByRole("link", { name: "Needs attention" }));
+  expect(screen.getByRole("heading", { name: "Needs attention" })).toBeInTheDocument();
+  expect(screen.getByRole("tab", { name: "Outside band" })).toHaveAttribute(
+    "aria-selected", "true",
+  );
+  expect(screen.getByRole("menuitem", { name: "Needs attention" })).toHaveClass(
     "ant-menu-item-selected",
   );
 });

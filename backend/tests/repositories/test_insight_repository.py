@@ -1,8 +1,9 @@
 import pytest
 from sqlalchemy.orm import Session
 
-from app.models import EmploymentStatus
+from app.models import EmploymentStatus, SalaryBand
 from app.repositories.insight_repository import InsightRepository, SalaryRow
+from app.services.peer_groups import PeerGroupKey
 from tests.conftest import make_employee
 
 
@@ -31,6 +32,39 @@ def test_only_active_and_on_leave_employees_are_selected(repository: InsightRepo
     assert len(rows) == 2
     assert {row.employee_id for row in rows} == {1, 2}
     assert all(isinstance(row, SalaryRow) for row in rows)
+    assert all(row.name == "Ada Lovelace" and row.department == "Engineering" for row in rows)
+
+
+def test_department_filter_is_applied_with_other_filters(repository: InsightRepository) -> None:
+    assert len(repository.active_salary_rows(departments=["Engineering"])) == 2
+    assert repository.active_salary_rows(departments=["Data"]) == []
+    assert (
+        len(
+            repository.active_salary_rows(
+                countries=["JP"],
+                departments=["Engineering"],
+            )
+        )
+        == 1
+    )
+
+
+def test_salary_bands_are_lightweight_and_keyed_by_title_level_country(session: Session) -> None:
+    session.add(
+        SalaryBand(
+            title="Engineer",
+            level=3,
+            country="US",
+            currency="USD",
+            min_minor=800,
+            mid_minor=1_000,
+            max_minor=1_200,
+        )
+    )
+    session.commit()
+    bands = InsightRepository(session).salary_bands()
+    assert list(bands) == [PeerGroupKey("Engineer", 3, "US")]
+    assert tuple(bands[PeerGroupKey("Engineer", 3, "US")]) == ("USD", 800, 1_000, 1_200)
 
 
 @pytest.mark.parametrize(

@@ -10,7 +10,7 @@ from sqlalchemy.pool import ConnectionPoolEntry, StaticPool
 
 from app.db import get_session
 from app.main import app
-from app.models import Base, Employee, EmploymentStatus, EmploymentType, Gender
+from app.models import Base, Employee, EmploymentStatus, EmploymentType, Gender, SalaryBand
 
 
 @pytest.fixture
@@ -96,3 +96,51 @@ def make_employee(**overrides: object) -> Employee:
     }
     values.update(overrides)
     return Employee(**values)
+
+
+ATTENTION_TITLE = "Attention Role"
+
+
+@pytest.fixture
+def attention_client(api_client: TestClient, session: Session) -> TestClient:
+    for number, salary in enumerate([700, 800, 1_000, 1_000, 1_200, 1_450, 1_300], start=1):
+        session.add(
+            make_employee(
+                email=f"attention.{number}@example.com",
+                name=f"Attention {number}",
+                title=ATTENTION_TITLE,
+                salary_minor=salary,
+                department="Data" if number == 7 else "Engineering",
+                status=EmploymentStatus.ON_LEAVE if number == 7 else EmploymentStatus.ACTIVE,
+            )
+        )
+    session.add(
+        make_employee(
+            email="attention.missing@example.com",
+            title=ATTENTION_TITLE,
+            country="GB",
+            currency="GBP",
+            salary_minor=1_500,
+        )
+    )
+    session.add(
+        make_employee(
+            email="attention.terminated@example.com",
+            title=ATTENTION_TITLE,
+            salary_minor=1,
+            status=EmploymentStatus.TERMINATED,
+        )
+    )
+    session.add(
+        SalaryBand(
+            title=ATTENTION_TITLE,
+            level=3,
+            country="US",
+            currency="USD",
+            min_minor=800,
+            mid_minor=1_000,
+            max_minor=1_200,
+        )
+    )
+    session.commit()
+    return api_client
