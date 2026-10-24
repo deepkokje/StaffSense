@@ -1,15 +1,18 @@
 import { Layout } from "antd";
 
-import Dashboard from "./pages/Dashboard";
+import EmployeesPage from "./pages/EmployeesPage";
+
+const APP_NAME = "StaffSense";
+const CONTENT_PADDING = 24;
 
 export default function App() {
   return (
     <Layout style={{ minHeight: "100vh" }}>
       <Layout.Header>
-        <span style={{ color: "white" }}>StaffSense</span>
+        <span style={{ color: "white" }}>{APP_NAME}</span>
       </Layout.Header>
-      <Layout.Content style={{ padding: "24px" }}>
-        <Dashboard />
+      <Layout.Content style={{ padding: CONTENT_PADDING }}>
+        <EmployeesPage />
       </Layout.Content>
     </Layout>
   );

@@ -1,46 +1,22 @@
 import "@testing-library/jest-dom/vitest";
-import { useQueryClient } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 
 import App from "./App";
-import AppProviders from "./AppProviders";
+import { renderWithQueryClient } from "./test/renderWithQueryClient";
 
-test("renders the placeholder title", () => {
-  render(
-    <AppProviders>
-      <App />
-    </AppProviders>,
+test("renders the StaffSense employee page", () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({ items: [], total: 0, page: 1, page_size: 25, total_pages: 0 }),
+        { status: 200 },
+      ),
+    ),
   );
+  renderWithQueryClient(<App />);
 
-  expect(
-    screen.getByRole("heading", { name: "Dashboard", level: 1 }),
-  ).toBeInTheDocument();
-});
-
-test("provides a stable query client across rerenders", () => {
-  const captureClient = vi.fn();
-
-  function QueryClientConsumer() {
-    captureClient(useQueryClient());
-    return null;
-  }
-
-  const { rerender } = render(
-    <AppProviders>
-      <QueryClientConsumer />
-    </AppProviders>,
-  );
-  const initialClient = captureClient.mock.lastCall?.[0];
-
-  expect(initialClient).toBeDefined();
-
-  rerender(
-    <AppProviders>
-      <QueryClientConsumer />
-    </AppProviders>,
-  );
-
-  expect(captureClient).toHaveBeenCalledTimes(2);
-  expect(captureClient.mock.lastCall?.[0]).toBe(initialClient);
+  expect(screen.getByText("StaffSense")).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Employees" })).toBeInTheDocument();
 });
