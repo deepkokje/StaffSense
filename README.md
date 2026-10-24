@@ -4,7 +4,7 @@ A bare-bones salary management monorepo using FastAPI, SQLAlchemy and SQLite
 for the backend, and React, TypeScript, Ant Design and TanStack React Query
 for the frontend.
 Includes an employee directory, peer-group salary benchmarks, and band compliance
-and outlier reporting.
+and outlier reporting, plus read-only what-if cost estimates.
 
 ## Backend
 
@@ -66,6 +66,40 @@ per-mille (1000 = 100%), rounded half-even using integer arithmetic. Salaries an
 gaps remain local-currency integer minor units. Currency mismatches are rejected;
 ratios with a zero midpoint or peer median are undefined and raise an error.
 
+### What-if cost
+
+- `GET /insights/what-if/bring-to-band-min` accepts repeatable `country`,
+  `department`, `title` and `level` filters. It calculates the cost of raising
+  eligible employees below their band's minimum to that minimum. Missing bands
+  are skipped.
+- `GET /insights/what-if/raise` requires `department` and integer `raise_bp`
+  (1 through 5000, where 500 means 5%), with an optional single `country`.
+  Unknown departments return zero employees and zero costs.
+
+Costs are annual base salary only, for ACTIVE and ON_LEAVE employees. Nothing is
+saved. Responses include `employees_affected`, `total_cost_usd_minor`, and
+`by_country` rows with `country`, `currency`, `employees_affected`,
+`cost_local_minor` and `cost_usd_minor`, sorted by USD cost descending then country.
+Raise responses also include `current_payroll_usd_minor` and
+`new_payroll_usd_minor` (current payroll plus total cost).
+
+Each employee's raise is rounded half-even in local minor units. Costs and
+current payroll are summed locally per country before each total is converted
+once using stored integer FX rates, avoiding employee-level FX rounding drift.
+Missing required FX rates and mixed currencies within a country raise errors.
+The raise employee count includes every selected employee, even when a tiny
+raise rounds to zero local minor units.
+
+Run the non-asserting benchmark against 10,000 synthetic employees in an isolated
+temporary database:
+
+```sh
+python -m scripts.benchmark_insights
+```
+
+It times all current insight GET endpoints, including equity if later present.
+The target is below 500 ms per call; timing results are printed, not asserted.
+
 ## Frontend
 
 Requires Node.js 20 or newer. In another terminal, from the repository root:
@@ -80,14 +114,18 @@ npm run dev
 Open the URL printed by Vite (normally http://localhost:5173).
 For a type-checked production build, run `npm run build`.
 
-The sidebar links to `/employees`, `/insights/benchmarks` and
-`/insights/attention`; `/` redirects to `/employees`. Benchmark filters apply
+The sidebar links to `/employees`, `/insights/benchmarks`,
+`/insights/attention` and `/insights/what-if`; `/` redirects to `/employees`. Benchmark filters apply
 immediately, and the table paginates the returned groups locally.
 Needs attention uses server pagination and offers Outside band and Outliers vs
 peers tabs. The selected tab is stored in `?tab=bands|outliers`. Clicking Below
 min or Above max toggles a status filter without changing the summary counts.
 Filter changes reset the relevant table to page one. TanStack React Query manages
 all server data; the UI only formats monetary values and per-mille integers.
+The What-if page loads band-minimum cost automatically and calculates a
+department raise only after a valid form submission. Percentages are parsed as
+strings into integer basis points, with at most two decimal places and a range
+of 0.01% through 50%. Changing draft form values does not request a new scenario.
 Set `VITE_API_BASE_URL` before starting or building the UI (default
 `http://localhost:8000`). Production hosts must serve `index.html` for frontend
 routes so direct links and refreshes work.

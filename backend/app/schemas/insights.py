@@ -97,3 +97,26 @@ class OutliersResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class CountryCostOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    country: str
+    currency: str
+    employees_affected: int
+    cost_local_minor: int
+    cost_usd_minor: int
+
+
+class BandMinCostResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    total_cost_usd_minor: int
+    employees_affected: int
+    by_country: list[CountryCostOut]
+
+
+class RaiseCostResponse(BandMinCostResponse):
+    current_payroll_usd_minor: int
+    new_payroll_usd_minor: int

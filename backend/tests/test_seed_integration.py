@@ -1,11 +1,12 @@
 from random import Random
 
 from app.repositories.insight_repository import BandRow, SalaryRow
-from app.seeding import apply_planted_patterns, build_salary_bands, generate_employees
+from app.seeding import FX_RATES, apply_planted_patterns, build_salary_bands, generate_employees
 from app.services.band_compliance import evaluate_bands
 from app.services.benchmarks import compute_benchmarks
 from app.services.outliers import find_outliers
 from app.services.peer_groups import PeerGroupKey
+from app.services.what_if import cost_to_reach_band_min
 
 SEED = 42
 EMPLOYEE_COUNT = 3_000
@@ -46,3 +47,7 @@ def test_seeded_data_has_sufficient_and_insufficient_peer_groups() -> None:
     assert report.summary.below_min > 0
     assert report.summary.above_max > 0
     assert len(find_outliers(rows)) > 0
+    cost = cost_to_reach_band_min(rows, bands_by_key, FX_RATES)
+    assert cost.total_cost_usd_minor > 0
+    # Cross multiplication checks 1% <= affected/3000 <= 6% without floats.
+    assert EMPLOYEE_COUNT <= cost.employees_affected * 100 <= EMPLOYEE_COUNT * 6

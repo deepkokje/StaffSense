@@ -1,10 +1,18 @@
 import pytest
 from sqlalchemy.orm import Session
 
-from app.models import EmploymentStatus, SalaryBand
+from app.models import EmploymentStatus, FxRate, SalaryBand
 from app.repositories.insight_repository import InsightRepository, SalaryRow
 from app.services.peer_groups import PeerGroupKey
 from tests.conftest import make_employee
+
+
+def test_fx_rates_returns_currency_to_integer_rate_mapping(session: Session) -> None:
+    session.add_all(
+        [FxRate(currency="USD", usd_rate_e6=1_000_000), FxRate(currency="INR", usd_rate_e6=12_000)]
+    )
+    session.commit()
+    assert InsightRepository(session).fx_rates() == {"USD": 1_000_000, "INR": 12_000}
 
 
 @pytest.fixture

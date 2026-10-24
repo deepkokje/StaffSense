@@ -65,12 +65,12 @@ test("band pagination requests a new page and a country filter resets page to on
   bandsApi.mockResolvedValue(makeBandsResponse({ total: 26 }));
   renderPage();
   await screen.findByText("Ada Lovelace");
-  await userEvent.click(screen.getByRole("button", { name: "right" }));
+  fireEvent.click(screen.getByRole("button", { name: "right" }));
   await waitFor(() => expect(bandsApi).toHaveBeenLastCalledWith(
     expect.objectContaining({ page: 2 }), expect.any(AbortSignal),
   ));
-  fireEvent.mouseDown(screen.getByRole("combobox", { name: "Attention country" }));
-  await userEvent.click(await screen.findByRole("option", { name: "JP" }));
+  fireEvent.mouseDown(screen.getByLabelText("Attention country", { selector: "input" }));
+  fireEvent.click(await screen.findByText("JP", { selector: ".ant-select-item-option-content" }));
   await waitFor(() => expect(bandsApi).toHaveBeenLastCalledWith(
     expect.objectContaining({ country: ["JP"], page: 1 }), expect.any(AbortSignal),
   ));

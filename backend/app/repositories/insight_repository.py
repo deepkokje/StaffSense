@@ -4,7 +4,7 @@ from typing import NamedTuple
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Employee, EmploymentStatus, SalaryBand
+from app.models import Employee, EmploymentStatus, FxRate, SalaryBand
 from app.services.peer_groups import PeerGroupKey
 
 ELIGIBLE_SALARY_STATUSES = (EmploymentStatus.ACTIVE, EmploymentStatus.ON_LEAVE)
@@ -31,6 +31,11 @@ class BandRow(NamedTuple):
 class InsightRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
+
+    def fx_rates(self) -> dict[str, int]:
+        return dict(
+            self._session.execute(select(FxRate.currency, FxRate.usd_rate_e6)).tuples().all()
+        )
 
     def active_salary_rows(
         self,

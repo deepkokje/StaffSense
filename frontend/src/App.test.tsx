@@ -7,6 +7,7 @@ import { beforeEach, expect, test, vi } from "vitest";
 import App from "./App";
 import { NAVIGATION_ITEMS } from "./constants/navigation";
 import { makeBandsResponse } from "./test/attentionFactories";
+import { makeBandMinCost } from "./test/whatIfFactories";
 import { renderWithQueryClient } from "./test/renderWithQueryClient";
 
 beforeEach(() => {
@@ -14,7 +15,9 @@ beforeEach(() => {
     "fetch",
     vi.fn((input: RequestInfo | URL) => {
       const path = new URL(String(input)).pathname;
-      const body = path === "/insights/bands"
+      const body = path === "/insights/what-if/bring-to-band-min"
+        ? makeBandMinCost()
+        : path === "/insights/bands"
         ? makeBandsResponse({ items: [], total: 0 })
         : { items: [], total: 0, page: 1, page_size: 25, total_pages: 0 };
       return Promise.resolve(new Response(
@@ -62,6 +65,16 @@ test("clicking Needs attention opens the band compliance tab", async () => {
     "aria-selected", "true",
   );
   expect(screen.getByRole("menuitem", { name: "Needs attention" })).toHaveClass(
+    "ant-menu-item-selected",
+  );
+});
+
+test("clicking What-if opens the cost calculator and selects its menu item", async () => {
+  renderApp("/employees");
+  await userEvent.click(screen.getByRole("link", { name: "What-if" }));
+  expect(screen.getByRole("heading", { name: "What-if" })).toBeInTheDocument();
+  expect(screen.getByText("Bring everyone to band minimum")).toBeInTheDocument();
+  expect(screen.getByRole("menuitem", { name: "What-if" })).toHaveClass(
     "ant-menu-item-selected",
   );
 });

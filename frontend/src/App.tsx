@@ -5,6 +5,7 @@ import { NAVIGATION_ITEMS } from "./constants/navigation";
 import AttentionPage from "./pages/AttentionPage";
 import BenchmarksPage from "./pages/BenchmarksPage";
 import EmployeesPage from "./pages/EmployeesPage";
+import WhatIfPage from "./pages/WhatIfPage";
 
 const APP_NAME = "StaffSense";
 const CONTENT_PADDING = 24;
@@ -34,6 +35,7 @@ export default function App() {
             <Route path="/employees" element={<EmployeesPage />} />
             <Route path="/insights/benchmarks" element={<BenchmarksPage />} />
             <Route path="/insights/attention" element={<AttentionPage />} />
+            <Route path="/insights/what-if" element={<WhatIfPage />} />
           </Routes>
         </Layout.Content>
       </Layout>

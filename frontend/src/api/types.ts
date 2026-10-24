@@ -159,3 +159,32 @@ export interface OutliersResponse extends AttentionPageQuery {
   items: Outlier[];
   total: number;
 }
+
+export interface CountryCost {
+  country: string;
+  currency: string;
+  employees_affected: number;
+  cost_local_minor: number;
+  cost_usd_minor: number;
+}
+
+export interface BandMinCostReport {
+  total_cost_usd_minor: number;
+  employees_affected: number;
+  by_country: CountryCost[];
+}
+
+export interface RaiseCostReport extends BandMinCostReport {
+  current_payroll_usd_minor: number;
+  new_payroll_usd_minor: number;
+}
+
+export interface BringToBandMinQuery extends PeerFilters {
+  department?: readonly string[];
+}
+
+export interface RaiseCostQuery {
+  department: string;
+  raise_bp: number;
+  country?: string;
+}
