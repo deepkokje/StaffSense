@@ -114,8 +114,22 @@ npm run dev
 Open the URL printed by Vite (normally http://localhost:5173).
 For a type-checked production build, run `npm run build`.
 
-The sidebar links to `/employees`, `/insights/benchmarks`,
-`/insights/attention` and `/insights/what-if`; `/` redirects to `/employees`. Benchmark filters apply
+The sidebar starts with Dashboard at `/`, titled "How we pay people", followed
+by `/employees`, `/insights/benchmarks`, `/insights/attention` and `/insights/what-if`.
+The dashboard reuses existing query hooks with summary-sized requests. Each
+headline has its own loading, empty and retry state; below-band and above-band
+cards share one band-summary request. Detail links open the appropriate page or
+Attention tab without applying an unsupported status URL filter.
+Dashboard cards use accessible bar graphs: band counts with the relevant category
+highlighted and an outlier count. The cost card uses a pie chart of annual
+band-minimum costs by country in USD using Recharts, with exact amounts in its
+color legend and formatted USD hover tooltips.
+Each card uses an independent scale and retains exact value labels. Integer
+scaling is used only for bar geometry, not monetary calculations. Recharts
+calculates pie geometry directly from the unchanged USD minor-unit values.
+The dashboard contains four cards: Below band, Above band, Outliers and Cost to
+reach band minimum.
+Benchmark filters apply
 immediately, and the table paginates the returned groups locally.
 Needs attention uses server pagination and offers Outside band and Outliers vs
 peers tabs. The selected tab is stored in `?tab=bands|outliers`. Clicking Below

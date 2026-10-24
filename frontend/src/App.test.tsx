@@ -1,6 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, test, vi } from "vitest";
 
@@ -34,11 +33,13 @@ function renderApp(path = "/") {
   );
 }
 
-test("redirects the root route to the Employees page", () => {
+test("renders the dashboard at root and highlights Dashboard", () => {
   renderApp();
 
   expect(screen.getByText("StaffSense")).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "Employees" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "How we pay people" })).toBeInTheDocument();
+  expect(screen.getByRole("menuitem", { name: "Dashboard" })).toHaveClass("ant-menu-item-selected");
+  expect(screen.getByRole("menuitem", { name: "Employees" })).not.toHaveClass("ant-menu-item-selected");
 });
 
 test("builds the menu from the shared navigation array", () => {
@@ -46,11 +47,12 @@ test("builds the menu from the shared navigation array", () => {
   for (const item of NAVIGATION_ITEMS) {
     expect(screen.getByRole("link", { name: item.label })).toHaveAttribute("href", item.path);
   }
+  expect(screen.getAllByRole("menuitem")[0]).toHaveTextContent("Dashboard");
 });
 
 test("clicking Benchmarks navigates to its page and selects its menu item", async () => {
   renderApp("/employees");
-  await userEvent.click(screen.getByRole("link", { name: "Benchmarks" }));
+  fireEvent.click(screen.getByRole("link", { name: "Benchmarks" }));
   expect(screen.getByRole("heading", { name: "Benchmarks" })).toBeInTheDocument();
   expect(screen.getByRole("menuitem", { name: "Benchmarks" })).toHaveClass(
     "ant-menu-item-selected",
@@ -59,7 +61,7 @@ test("clicking Benchmarks navigates to its page and selects its menu item", asyn
 
 test("clicking Needs attention opens the band compliance tab", async () => {
   renderApp("/employees");
-  await userEvent.click(screen.getByRole("link", { name: "Needs attention" }));
+  fireEvent.click(screen.getByRole("link", { name: "Needs attention" }));
   expect(screen.getByRole("heading", { name: "Needs attention" })).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "Outside band" })).toHaveAttribute(
     "aria-selected", "true",
@@ -71,10 +73,27 @@ test("clicking Needs attention opens the band compliance tab", async () => {
 
 test("clicking What-if opens the cost calculator and selects its menu item", async () => {
   renderApp("/employees");
-  await userEvent.click(screen.getByRole("link", { name: "What-if" }));
+  fireEvent.click(screen.getByRole("link", { name: "What-if" }));
   expect(screen.getByRole("heading", { name: "What-if" })).toBeInTheDocument();
   expect(screen.getByText("Bring everyone to band minimum")).toBeInTheDocument();
   expect(screen.getByRole("menuitem", { name: "What-if" })).toHaveClass(
     "ant-menu-item-selected",
   );
+});
+
+test.each([
+  ["Below band", "Needs attention", "Outside band"],
+  ["Above band", "Needs attention", "Outside band"],
+  ["Outliers", "Needs attention", "Outliers vs peers"],
+  ["Cost to reach band minimum", "What-if", undefined],
+])("dashboard %s link opens its detail page", (title, heading, tab) => {
+  renderApp();
+  const card = within(screen.getByRole("region", { name: title }));
+  fireEvent.click(card.getByRole("link"));
+  expect(screen.getByRole("heading", { name: heading })).toBeInTheDocument();
+  if (tab) {
+    expect(screen.getByRole("tab", { name: tab })).toHaveAttribute("aria-selected", "true");
+  }
+  expect(screen.getByRole("menuitem", { name: heading })).toHaveClass("ant-menu-item-selected");
+  expect(screen.getByRole("menuitem", { name: "Dashboard" })).not.toHaveClass("ant-menu-item-selected");
 });
