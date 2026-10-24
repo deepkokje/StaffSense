@@ -1,0 +1,11 @@
+# Runtime dependencies
+fastapi==0.115.6
+Faker==33.3.1
+pydantic-settings==2.7.0
+SQLAlchemy==2.0.36
+uvicorn==0.34.0
+
+# Development and test dependencies
+httpx==0.28.1
+pytest==8.3.4
+ruff==0.8.4
