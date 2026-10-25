@@ -29,6 +29,7 @@ Settings are read from environment variables, with these defaults:
 | --- | --- |
 | `STAFFSENSE_APP_NAME` | `StaffSense` |
 | `STAFFSENSE_DATABASE_URL` | `sqlite:///./staffsense.db` |
+| `STAFFSENSE_CORS_ORIGINS` | `["http://localhost:5173"]` |
 
 Create tables and load synthetic employees before querying a new database:
 
@@ -196,6 +197,73 @@ of 0.01% through 50%. Changing draft form values does not request a new scenario
 Set `VITE_API_BASE_URL` before starting or building the UI (default
 `http://localhost:8000`). Production hosts must serve `index.html` for frontend
 routes so direct links and refreshes work.
+
+## Demo API deployment: Render Free
+
+The root `render.yaml` configures a free Python web service for the backend.
+It installs runtime dependencies with `pip install .`, pins Python 3.12.12,
+and runs:
+
+```sh
+python -m scripts.seed --reset && exec uvicorn app.main:app --host 0.0.0.0 --port "$PORT"
+```
+
+**Demo only:** every service start recreates `staffsense-demo.db` with 10,000
+synthetic employees. All employee edits are lost on restart, redeploy or wake-up
+after idle sleep. The reset is confined to the database configured for this
+Render service; normal local startup is unchanged. Do not point this service at
+a database containing data you want to keep. Seeding must succeed before the
+API starts.
+
+The API currently has no authentication. Anyone with its public URL can read,
+create, edit and delete demo employees. Use synthetic data only; CORS does not
+provide authentication or prevent direct API access.
+
+### First deployment
+
+1. Commit and push the deployment changes to your GitHub repository.
+2. Create an account at [Render](https://dashboard.render.com/) using GitHub.
+3. Select **New > Blueprint**, connect `deepkokje/StaffSense`, and grant Render
+   access to this repository. If GitHub access is not configured, follow the
+   prompt to install/authorize the Render GitHub app for this repository only.
+4. Select the branch containing these changes (normally `main`) and use
+   `render.yaml` as the Blueprint path.
+5. Review the proposed resources: there should be just one **Free** web service,
+   `staffsense-api`, with no paid database or disk. Then select **Deploy Blueprint**.
+6. Wait for the service to become live. The logs should show the seed summary
+   followed by Uvicorn startup. Copy the service's actual `https://...onrender.com`
+   URL from its dashboard.
+7. Verify the deployed API, replacing the example hostname:
+
+   ```sh
+   curl --fail https://YOUR-API.onrender.com/health
+   curl --fail 'https://YOUR-API.onrender.com/employees?page=1&page_size=1'
+   ```
+
+   Health should return `{"status":"ok"}`. The employee response should contain
+   a seeded item and `total: 10000`. Interactive API documentation is at `/docs`.
+
+Render Free sleeps after 15 minutes without inbound traffic. Waking it can take
+about a minute, plus seed time; open and check the API before presenting.
+Free instance-hour, bandwidth and build limits also apply. See
+[Render's free-tier limitations](https://render.com/docs/free).
+
+### Connecting the UI later
+
+Initially, CORS permits only `http://localhost:5173`, so the local UI can use the
+deployed API by setting `VITE_API_BASE_URL` to its HTTPS URL and restarting Vite.
+When Cloudflare Pages is deployed, update `STAFFSENSE_CORS_ORIGINS` in
+`render.yaml` and push:
+
+```yaml
+      - key: STAFFSENSE_CORS_ORIGINS
+        value: '["https://YOUR-UI.pages.dev","http://localhost:5173"]'
+```
+
+Use exact origins without a trailing slash. The value must be a JSON array,
+not a comma-separated string. Changing the Blueprint redeploys the API and
+resets demo data. Set `VITE_API_BASE_URL` in Cloudflare Pages before building
+the UI; no database credentials belong in frontend environment variables.
 
 ## Architecture
 

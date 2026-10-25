@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: staffsense-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install .
+    startCommand: python -m scripts.seed --reset && exec uvicorn app.main:app --host 0.0.0.0 --port "$PORT"
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.12"
+      - key: STAFFSENSE_DATABASE_URL
+        value: sqlite:///./staffsense-demo.db
+      - key: STAFFSENSE_CORS_ORIGINS
+        value: '["http://localhost:5173"]'
