@@ -13,4 +13,4 @@ services:
       - key: STAFFSENSE_DATABASE_URL
         value: sqlite:///./staffsense-demo.db
       - key: STAFFSENSE_CORS_ORIGINS
-        value: '["http://localhost:5173"]'
+        value: '["https://staffsense.pages.dev","http://localhost:5173"]'

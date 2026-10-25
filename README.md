@@ -265,6 +265,90 @@ not a comma-separated string. Changing the Blueprint redeploys the API and
 resets demo data. Set `VITE_API_BASE_URL` in Cloudflare Pages before building
 the UI; no database credentials belong in frontend environment variables.
 
+## Demo UI deployment: Cloudflare Pages Free
+
+The demo API is at `https://staffsense-api-027r.onrender.com`.
+The existing Vite app builds directly for Pages; no Worker, server or additional
+deployment package is needed.
+
+### Create the Pages project
+
+1. Sign up at [Cloudflare](https://dash.cloudflare.com/sign-up). You do not need
+   to buy a domain or transfer DNS to use the free `pages.dev` address.
+2. In **Workers & Pages**, select **Create application > Pages > Import an
+   existing Git repository**. Choose **Pages**, not a Worker deployment.
+3. Connect GitHub, authorize Cloudflare Pages for `deepkokje/StaffSense`, and
+   select that repository.
+4. Use these build settings:
+
+   | Setting | Value |
+   | --- | --- |
+   | Project name | `staffsense` (or an available name) |
+   | Production branch | `main` |
+   | Framework preset | `React (Vite)` (or `Vite`, if listed) |
+   | Root directory | `frontend` |
+   | Build command | `npm run build` |
+   | Build output directory | `dist` |
+
+   The output directory is relative to `frontend`, so do not enter
+   `frontend/dist`. If no matching framework preset appears, choose **None**
+   and enter the build command and output directory above.
+5. Before deploying, add these **Production** build environment variables:
+
+   | Variable | Value |
+   | --- | --- |
+   | `NODE_VERSION` | `22` |
+   | `VITE_API_BASE_URL` | `https://staffsense-api-027r.onrender.com` |
+
+   Vite embeds the API URL in public JavaScript at build time. This URL is not a
+   secret. Do not put database credentials or other secrets in `VITE_*` variables.
+6. Select **Save and Deploy** and copy the project's production URL, for example
+   `https://staffsense.pages.dev`. Use the actual assigned URL, not a
+   deployment-specific preview URL. Git pushes to `main` trigger new builds.
+
+### Permit the deployed UI in the API
+
+The first UI deployment can load its shell but cannot fetch API data until its
+exact origin is allowed. Replace `YOUR-UI` in the existing
+`STAFFSENSE_CORS_ORIGINS` entry in `render.yaml`:
+
+```yaml
+      - key: STAFFSENSE_CORS_ORIGINS
+        value: '["https://YOUR-UI.pages.dev","http://localhost:5173"]'
+```
+
+Commit and push this change, wait for the Render Blueprint sync and successful
+API deployment, then reload the UI. This restarts the API and resets demo data.
+Do not use `*` or a wildcard `pages.dev` origin. Preview URLs have different
+origins and are not permitted unless explicitly added; use the production URL
+for the demo.
+
+### Verify the deployment
+
+- Open the UI's production URL and confirm dashboard data and employees load.
+- Open `/employees` directly and refresh it; repeat for `/insights/what-if`.
+  Cloudflare Pages automatically serves the SPA for non-asset routes when there
+  is no top-level `404.html`. The current build has none; no custom redirect rule
+  is needed.
+- Check API preflight using the actual UI origin:
+
+  ```sh
+  curl --fail -i -X OPTIONS \
+    https://staffsense-api-027r.onrender.com/employees \
+    -H 'Origin: https://YOUR-UI.pages.dev' \
+    -H 'Access-Control-Request-Method: POST' \
+    -H 'Access-Control-Request-Headers: content-type'
+  ```
+
+  Expect HTTP 200 and `access-control-allow-origin` matching the UI origin.
+- Test creating or editing a synthetic employee. Remember all edits are temporary.
+
+If the UI requests `localhost:8000`, fix the Production `VITE_API_BASE_URL` and
+trigger a new Pages build; changing a build variable does not update an existing
+deployment. If requests fail with CORS errors, check the exact production origin
+and wait for Render to finish redeploying. A sleeping API may also take about a
+minute to wake up; verify `/health` before presenting.
+
 ## Architecture
 
 Backend dependencies flow from routers to services to repositories to models.
