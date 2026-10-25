@@ -1,43 +1,63 @@
-# Salary Management Software: Requirements
-24 Oct 2026 · @Deep Kokje
+# StaffSense: Implemented Requirements
 
-**Goal:** Replace ACME's Excel salary files with one web app that lets the HR manager answer three questions in seconds: are we paying fairly, are we paying consistently, and what would it cost to fix it?
+**Author:** @Deep Kokje  
+**Last updated:** 25 Oct 2026
 
-**Persona:** One HR manager, 10,000 employees across multiple countries. Needs trusted numbers, fast answers, and no spreadsheet wrangling.
+## Goal
 
-## Scope and features
-The first screen is a dashboard of five headline insights. Each one names the action it drives.
+Give one HR manager a searchable employee directory, salary comparisons and
+read-only cost estimates for a multi-country workforce.
 
-| Priority | Feature | Question the HR manager asks | Action it drives |
-| --- | --- | --- | --- |
-| Headline | Pay equity | Is there a gender pay gap? Raw gap, and adjusted gap within the same title, level and country. | Remediation, compliance |
-| Headline | Band compliance | Who is paid outside their salary band? Compa-ratio = salary ÷ band midpoint. | Fix under- and over-paid people |
-| Headline | Outliers vs peers | Who deviates more than 20% from their peer-group median? | Review list |
-| Headline | Pay benchmarks | What is the going rate for a title, level and country (min, p25, median, p75, max)? | Offers and reviews |
-| Headline | What-if cost | What does it cost to lift everyone to band minimum, or give X% to a department? | Budget request |
-| Core | Pay snapshot | What is our headcount, payroll and distribution by country, department and level? | Budget baseline |
-| Core | Employee directory | Find, add, edit and delete employees; export the filtered view to CSV. | Replace Excel day to day |
-| Stretch | Compression and inversion | Are new hires out-earning tenured peers, or reports out-earning managers? | Retention risk |
-| Stretch | Pay progression | Who has gone longest without a raise? | Raise cycle planning |
-| Stretch | Geo comparison | How does the same role pay across countries? | Location strategy |
+## Current features
 
-**Foundations:**
+| Feature | Implemented behavior |
+| --- | --- |
+| Dashboard | Home page titled "How we pay people" with four cards: Below band, Above band, Outliers and Cost to reach band minimum. Band and outlier cards use bar graphs; cost uses a Recharts country-cost pie. Each card links to its detail page and handles loading and errors independently. |
+| Employee directory | Search name or email, filter employees, sort and paginate on the server. Display local salary and USD salary. |
+| Employee management | Add, edit and permanently delete employees. Validate unique email, manager existence and management cycles. Reject currency changes and deletion of managers with direct reports. |
+| Salary history | Record actual salary changes atomically with employee updates. Show newest-first history with old/new salary, signed change and percentage. Raises update the last raise date; cuts preserve it. |
+| Peer benchmarks | Show minimum, p25, median, p75 and maximum salary by title, level and country. Groups with fewer than five employees show insufficient data. |
+| Band compliance | Show below-minimum, within-band, above-maximum and missing-band counts, with a filtered and paginated attention list. |
+| Peer outliers | Flag eligible employees more than 20% from their peer-group median. Support filters, direction and pagination. |
+| What-if cost | Estimate the annual cost of reaching band minimum or giving a department a percentage raise. Scenarios are read-only. |
 
-- Salaries are stored in local currency and normalized to USD with a fixed rate table for cross-country views.
-- Peer group = title + level + country. Groups under 5 people show "insufficient data", so stats stay meaningful and individuals stay unidentifiable.
-- Each salary change records old value, new value and date.
-- A deterministic seed script creates 10,000 employees with realistic patterns: a small planted gender gap, some out-of-band people, a few compression cases.
+## Data and business rules
 
-## Deliberately left out
+- Salaries are integer minor units plus a supported currency code. Supported
+  currencies are USD, EUR, GBP, INR, JPY, CAD, AUD and SGD; JPY has no fractional
+  minor units, and the others have two.
+- FX rates are positive integers scaled by 1,000,000. The money module performs
+  conversion with Decimal and half-even rounding.
+- The server computes USD salary using stored FX rates; clients cannot supply
+  USD salary or the last raise date.
+- Employee writes require a positive salary, level 1 through 6 and valid input
+  fields. Emails are trimmed, lower-cased and checked case-insensitively for
+  uniqueness. Extra input fields are rejected.
+- Insight calculations include ACTIVE and ON_LEAVE employees, not TERMINATED.
+- Peer group means title + level + country. Local salary comparisons require
+  compatible currencies.
+- Band boundaries are inclusive. Employees without a band are counted separately
+  and skipped by the band-minimum cost calculation.
+- What-if raises use integer basis points from 1 through 5000. Per-employee raises
+  round half-even locally; country totals are converted to USD once per country
+  to avoid FX rounding drift.
+- Salary history stores old salary, new salary, currency and change timestamp.
+  Percentage changes use integer basis points and half-even rounding; a change
+  from zero has no defined percentage.
+- Creating an employee records no history. Saving the same salary or changing
+  only other fields records no history. Hard deletion removes history in the
+  same transaction as the employee.
+- Successful employee writes invalidate employee, insight and history query
+  caches so affected views reload current data.
 
-- **Auth and RBAC:** one persona, and it adds time without showing core judgment. First thing to add for production, since salary data is sensitive.
-- **Payroll, tax, bonuses, equity:** a different problem domain. Base salary only.
-- **Live FX rates:** non-deterministic, and the insights don't need that precision. Rates are a configurable static table.
-- **Excel import:** a one-time migration, so the seed script is enough here.
-- **Approval workflows and full audit trail:** premature for v1. Salary history is enough.a
+## Demo data and validation
 
-## Success criteria
-
-- Directory loads in under 300 ms and each insight in under 500 ms at 10,000 rows.
-- Every headline insight has unit tests, including empty, single-value and small-group cases.
-- The seeded demo shows a visible pay gap, out-of-band people and a non-zero what-if cost.
+- Deterministic seeding supports a 10,000-employee demo with salary bands, fixed
+  FX rates and existing salary-history entries.
+- Backend tests cover money, statistics, validation, repositories, endpoints,
+  salary-history transactions and seeded-data integration.
+- Frontend tests cover formatting, parsing, forms, navigation, query refresh,
+  history and loading/error/empty states.
+- An isolated benchmark script times the implemented insight endpoints with
+  10,000 employees. The target is below 500 ms per endpoint; timing is not a CI
+  assertion.

@@ -22,4 +22,12 @@ describe("formatMinorUnits", () => {
   test("formats a zero amount", () => {
     expect(formatMinorUnits(0, "USD")).toBe("$0.00");
   });
+
+  test("formats negative subunit amounts without losing their sign", () => {
+    expect(formatMinorUnits(-5, "USD")).toBe("-$0.05");
+  });
+
+  test("formats large integer minor units without a floating point conversion", () => {
+    expect(formatMinorUnits(99999999999999, "USD")).toBe("$999,999,999,999.99");
+  });
 });

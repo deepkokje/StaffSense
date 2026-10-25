@@ -1,10 +1,15 @@
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, delete, func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import Employee
+from app.models import Employee, FxRate, SalaryHistory
+from app.repositories.salary_history_repository import SalaryHistoryRepository
 from app.services.employee_query import EmployeeFilters, SortDirection, SortField
+from app.services.errors import DuplicateEmail
 
 LIKE_ESCAPE_CHARACTER = "\\"
 SEARCH_PATTERN_PREFIX = "%"
@@ -63,6 +68,54 @@ def _apply_filters(statement: Select[Any], filters: EmployeeFilters) -> Select[A
 class EmployeeRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
+        self.salary_history = SalaryHistoryRepository(session)
+
+    @contextmanager
+    def transaction(self) -> Iterator[None]:
+        try:
+            yield
+            self._session.commit()
+        except IntegrityError as error:
+            self._session.rollback()
+            if "UNIQUE constraint failed: employees.email" in str(error.orig):
+                raise DuplicateEmail("email is already used by another employee") from error
+            raise
+        except Exception:
+            self._session.rollback()
+            raise
+
+    def get(self, employee_id: int) -> Employee | None:
+        return self._session.get(Employee, employee_id)
+
+    def get_by_email(self, email: str) -> Employee | None:
+        return self._session.scalar(
+            select(Employee).where(func.lower(Employee.email) == email.lower()),
+        )
+
+    def add(self, employee: Employee) -> None:
+        self._session.add(employee)
+        self._session.flush()
+
+    def delete(self, employee: Employee) -> None:
+        self._session.delete(employee)
+
+    def has_direct_reports(self, employee_id: int) -> bool:
+        return self._session.scalar(
+            select(Employee.id).where(Employee.manager_id == employee_id).limit(1),
+        ) is not None
+
+    def get_manager_id(self, employee_id: int) -> int | None:
+        return self._session.scalar(
+            select(Employee.manager_id).where(Employee.id == employee_id),
+        )
+
+    def delete_salary_history_for(self, employee_id: int) -> None:
+        self._session.execute(
+            delete(SalaryHistory).where(SalaryHistory.employee_id == employee_id),
+        )
+
+    def fx_rates(self) -> dict[str, int]:
+        return dict(self._session.execute(select(FxRate.currency, FxRate.usd_rate_e6)).all())
 
     def search(
         self,

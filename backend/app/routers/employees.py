@@ -1,13 +1,17 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db import get_session
+from app.dependencies import Clock, get_clock
 from app.models.enums import EmploymentStatus, Gender
 from app.repositories.employee_repository import EmployeeRepository
-from app.schemas.employee import EmployeePage
+from app.schemas.employee import EmployeeInput, EmployeeOut, EmployeePage
+from app.schemas.salary_history import SalaryHistoryEntryOut, SalaryHistoryResponse
+from app.services import employee_service
 from app.services.employee_query import (
     InvalidEmployeeFiltersError,
     SortDirection,
@@ -15,8 +19,78 @@ from app.services.employee_query import (
     build_employee_filters,
     list_employees,
 )
+from app.services.errors import (
+    DuplicateEmail,
+    EmployeeError,
+    EmployeeNotFound,
+    HasDirectReports,
+    InvalidManager,
+    MissingFxRate,
+    UnsupportedChange,
+)
 
 router = APIRouter()
+ERROR_STATUS_CODES = {
+    EmployeeNotFound: 404,
+    DuplicateEmail: 409,
+    InvalidManager: 422,
+    UnsupportedChange: 422,
+    HasDirectReports: 409,
+    MissingFxRate: 422,
+}
+
+
+async def employee_error_handler(request: Request, error: EmployeeError) -> JSONResponse:
+    return JSONResponse(
+        status_code=ERROR_STATUS_CODES[type(error)], content={"detail": str(error)},
+    )
+
+
+@router.get("/employees/{employee_id}", response_model=EmployeeOut)
+def get_employee(
+    employee_id: int, session: Annotated[Session, Depends(get_session)],
+) -> EmployeeOut:
+    return EmployeeOut.model_validate(
+        employee_service.get_employee(EmployeeRepository(session), employee_id),
+    )
+
+
+@router.post("/employees", response_model=EmployeeOut, status_code=201)
+def create_employee(
+    data: EmployeeInput, session: Annotated[Session, Depends(get_session)],
+) -> EmployeeOut:
+    return EmployeeOut.model_validate(
+        employee_service.create_employee(EmployeeRepository(session), data),
+    )
+
+
+@router.put("/employees/{employee_id}", response_model=EmployeeOut)
+def update_employee(
+    employee_id: int, data: EmployeeInput,
+    session: Annotated[Session, Depends(get_session)],
+    clock: Annotated[Clock, Depends(get_clock)],
+) -> EmployeeOut:
+    return EmployeeOut.model_validate(
+        employee_service.update_employee(EmployeeRepository(session), employee_id, data, clock),
+    )
+
+
+@router.get("/employees/{employee_id}/salary-history", response_model=SalaryHistoryResponse)
+def get_salary_history(
+    employee_id: int, session: Annotated[Session, Depends(get_session)],
+) -> SalaryHistoryResponse:
+    changes = employee_service.list_salary_history(EmployeeRepository(session), employee_id)
+    return SalaryHistoryResponse(
+        items=[SalaryHistoryEntryOut.model_validate(change) for change in changes],
+    )
+
+
+@router.delete("/employees/{employee_id}", status_code=204)
+def delete_employee(
+    employee_id: int, session: Annotated[Session, Depends(get_session)],
+) -> Response:
+    employee_service.delete_employee(EmployeeRepository(session), employee_id)
+    return Response(status_code=204)
 
 
 @router.get("/employees", response_model=EmployeePage)

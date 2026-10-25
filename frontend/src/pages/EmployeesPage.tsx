@@ -1,16 +1,23 @@
-import { Alert, Space, Typography } from "antd";
+import { useState } from "react";
+import { Alert, Button, Space, Typography } from "antd";
 
-import type { EmployeeQuery } from "../api/types";
+import type { EmployeeOut, EmployeeQuery } from "../api/types";
 import EmployeeFilters from "../components/EmployeeFilters";
+import EmployeeFormDrawer from "../components/EmployeeFormDrawer";
 import EmployeeTable from "../components/EmployeeTable";
 import ErrorBanner from "../components/ErrorBanner";
+import SalaryHistoryDrawer from "../components/SalaryHistoryDrawer";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useEmployeeTableState } from "../hooks/useEmployeeTableState";
 import { useEmployeesQuery } from "../hooks/useEmployeesQuery";
+import { useDeleteEmployee } from "../hooks/useEmployeeMutations";
 
 const PAGE_TITLE = "Employees";
 
 export default function EmployeesPage() {
+  const [drawer, setDrawer] = useState<{ employee?: EmployeeOut } | null>(null);
+  const [historyEmployee, setHistoryEmployee] = useState<EmployeeOut>();
+  const deleteMutation = useDeleteEmployee();
   const tableState = useEmployeeTableState();
   const debouncedSearch = useDebouncedValue(tableState.search);
   const query: EmployeeQuery = {
@@ -36,6 +43,7 @@ export default function EmployeesPage() {
   return (
     <Space direction="vertical" size="large" style={{ width: "100%" }}>
       <Typography.Title level={1}>{PAGE_TITLE}</Typography.Title>
+      <Button type="primary" onClick={() => setDrawer({})}>Add employee</Button>
       <EmployeeFilters
         filters={tableState.filters}
         onClearFilters={tableState.clearFilters}
@@ -70,7 +78,15 @@ export default function EmployeesPage() {
         pageSize={tableState.pageSize}
         sortBy={tableState.sortBy}
         sortDir={tableState.sortDir}
+        onEdit={(employee) => setDrawer({ employee })}
+        onDelete={(employee) => deleteMutation.mutate(employee.id)}
+        deleting={deleteMutation.isPending}
+        onViewHistory={setHistoryEmployee}
       />
+      {drawer && (
+        <EmployeeFormDrawer employee={drawer.employee} onClose={() => setDrawer(null)} />
+      )}
+      <SalaryHistoryDrawer employee={historyEmployee} onClose={() => setHistoryEmployee(undefined)} />
     </Space>
   );
 }

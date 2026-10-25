@@ -2,8 +2,7 @@ import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-quer
 
 import { fetchEmployees } from "../api/employees";
 import type { EmployeePage, EmployeeQuery } from "../api/types";
-
-const EMPLOYEES_QUERY_KEY = "employees";
+import { queryKeys } from "../lib/queryKeys";
 
 function isEmployeePage(value: unknown): value is EmployeePage {
   return (
@@ -19,13 +18,13 @@ function isEmployeePage(value: unknown): value is EmployeePage {
 export function useEmployeesQuery(query: EmployeeQuery) {
   const queryClient = useQueryClient();
   const queryResult = useQuery({
-    queryKey: [EMPLOYEES_QUERY_KEY, query],
+    queryKey: [...queryKeys.employees, query],
     queryFn: ({ signal }) => fetchEmployees(query, signal),
     placeholderData: keepPreviousData,
   });
   const mostRecentCachedData = queryClient
     .getQueryCache()
-    .findAll({ queryKey: [EMPLOYEES_QUERY_KEY] })
+    .findAll({ queryKey: queryKeys.employees })
     .filter((cachedQuery) => cachedQuery.state.data !== undefined)
     .sort(
       (firstQuery, secondQuery) =>

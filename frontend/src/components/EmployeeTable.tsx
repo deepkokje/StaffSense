@@ -1,4 +1,4 @@
-import { Button, Empty, Table, Typography } from "antd";
+import { Button, Empty, Popconfirm, Space, Table, Typography } from "antd";
 import type { TableColumnsType, TableProps } from "antd";
 
 import type {
@@ -35,6 +35,10 @@ interface EmployeeTableProps {
   onPageChange: (page: number, pageSize: number) => void;
   onSortChange: (field: SortField, direction: SortDirection) => void;
   onClearFilters: () => void;
+  onEdit?: (employee: EmployeeOut) => void;
+  onDelete?: (employee: EmployeeOut) => void;
+  onViewHistory?: (employee: EmployeeOut) => void;
+  deleting?: boolean;
 }
 
 type EmployeeColumn = NonNullable<TableColumnsType<EmployeeOut>[number]>;
@@ -69,6 +73,10 @@ function createSortableColumn(
 function createColumns(
   sortBy: SortField,
   sortDir: SortDirection,
+  onEdit?: (employee: EmployeeOut) => void,
+  onDelete?: (employee: EmployeeOut) => void,
+  deleting?: boolean,
+  onViewHistory?: (employee: EmployeeOut) => void,
 ): TableColumnsType<EmployeeOut> {
   return [
     {
@@ -102,6 +110,24 @@ function createColumns(
       dataIndex: "status",
       key: "status",
     },
+    {
+      title: "Actions",
+      key: "actions",
+      render: (_value: unknown, employee: EmployeeOut) => (
+        <Space>
+          <Button onClick={() => onEdit?.(employee)} disabled={!onEdit}>Edit</Button>
+          <Button onClick={() => onViewHistory?.(employee)} disabled={!onViewHistory}>
+            History
+          </Button>
+          <Popconfirm
+            title="Delete this employee?" okText="Delete" cancelText="Cancel"
+            onConfirm={() => onDelete?.(employee)} disabled={!onDelete || deleting}
+          >
+            <Button danger disabled={!onDelete || deleting}>Delete</Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
   ];
 }
 
@@ -126,8 +152,12 @@ export default function EmployeeTable({
   onPageChange,
   onSortChange,
   onClearFilters,
+  onEdit,
+  onDelete,
+  deleting,
+  onViewHistory,
 }: EmployeeTableProps) {
-  const columns = createColumns(sortBy, sortDir);
+  const columns = createColumns(sortBy, sortDir, onEdit, onDelete, deleting, onViewHistory);
   const handleTableChange: TableProps<EmployeeOut>["onChange"] = (
     pagination,
     _filters,

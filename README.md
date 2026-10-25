@@ -4,7 +4,7 @@ A bare-bones salary management monorepo using FastAPI, SQLAlchemy and SQLite
 for the backend, and React, TypeScript, Ant Design and TanStack React Query
 for the frontend.
 Includes an employee directory, peer-group salary benchmarks, and band compliance
-and outlier reporting, plus read-only what-if cost estimates.
+and outlier reporting, plus read-only what-if cost estimates and employee editing.
 
 ## Backend
 
@@ -35,6 +35,40 @@ Create tables and load synthetic employees before querying a new database:
 ```sh
 python -m scripts.seed
 ```
+
+### Employee writes
+
+- `GET /employees/{id}` returns one employee.
+- `POST /employees` creates an employee (201).
+- `PUT /employees/{id}` replaces their editable fields (200).
+- `DELETE /employees/{id}` permanently removes them and their existing salary
+  history (204). Managers with direct reports cannot be deleted until reassigned.
+
+POST and PUT accept name, email, title, department, country, currency,
+salary_minor, level, gender, employment_type, status, hire_date and optional
+manager_id. Extra fields are rejected, including salary_usd_minor and
+last_raise_date. Names and emails are trimmed; emails are lower-cased and unique
+case-insensitively. Salaries must be positive integers in local minor units.
+The server computes USD salary with the money module and the stored FX rate.
+Currency changes and management cycles are rejected. Each write is atomic.
+Unknown employees return 404, duplicate emails and managers with reports return
+409, and invalid inputs or missing FX rates return 422.
+
+Creating an employee does not record history; their first salary is the starting
+point. Editing records a history row only when salary_minor actually changes.
+A raise sets last_raise_date to the change date; a cut preserves the previous
+raise date. The update and history insert share one transaction, including
+rollback when the history insert fails. Other edits and identical salary saves
+do not write history.
+
+`GET /employees/{id}/salary-history` returns `{ "items": [...] }`, newest timestamp
+first, then descending row ID for stable ties. Each entry contains
+old_salary_minor, new_salary_minor, currency, changed_at, signed change_minor
+and nullable change_bp. Basis points use integer half-even rounding; a change
+from zero has no defined percentage. Existing seeded history uses the same
+calculation. Unknown employees return 404; known employees without history
+return an empty list. Timestamps use UTC, with the clock injected through
+get_clock; SQLite stores the UTC datetime without an offset, as for seeded rows.
 
 `GET /insights/benchmarks` groups ACTIVE and ON_LEAVE employees by title, level
 and country. Repeatable `country`, `title` and `level` parameters narrow the groups.
@@ -113,6 +147,25 @@ npm run dev
 
 Open the URL printed by Vite (normally http://localhost:5173).
 For a type-checked production build, run `npm run build`.
+Vitest runs one worker to avoid CPU contention between Ant Design/jsdom tests.
+The full create-form integration test has a 10-second budget for its multiple
+dropdowns, date picker, submission and list refresh; its assertions are unchanged.
+
+The employee directory has Add employee, Edit, History and confirmed Delete actions.
+Salary input supports plain, international-grouped and Indian-grouped digits,
+with at most 12 typed digits and the currency's minor-unit precision (JPY: zero;
+the other supported currencies: two). Parsing and formatting use integer/string
+operations, never floating-point monetary arithmetic. Currency is locked during
+editing. Duplicate-email errors stay on the email field; other validation errors
+stay above the open form without discarding values.
+Successful writes invalidate employee and all insight query caches, including
+the queries shared by the dashboard and salary history. A query-key prefix for
+future equity is reserved without adding that feature.
+The form declares Day.js explicitly for Ant Design DatePicker date values.
+History opens a newest-first drawer with old/new salaries, signed changes,
+green raise/red cut tags and integer-formatted percentages. It handles loading,
+empty history and retryable errors. Successful edits invalidate history queries
+alongside employee and insight queries, refreshing open history immediately.
 
 The sidebar starts with Dashboard at `/`, titled "How we pay people", followed
 by `/employees`, `/insights/benchmarks`, `/insights/attention` and `/insights/what-if`.

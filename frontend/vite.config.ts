@@ -6,5 +6,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
+    // Ant Design/jsdom integration tests contend heavily for CPU when run in parallel.
+    maxWorkers: 1,
   },
 });

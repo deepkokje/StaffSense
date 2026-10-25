@@ -9,6 +9,9 @@ import EmployeesPage from "./EmployeesPage";
 
 vi.mock("../api/employees", () => ({
   fetchEmployees: vi.fn(),
+  createEmployee: vi.fn(),
+  updateEmployee: vi.fn(),
+  deleteEmployee: vi.fn(),
 }));
 
 const mockedFetchEmployees = vi.mocked(fetchEmployees);

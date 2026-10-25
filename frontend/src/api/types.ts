@@ -48,6 +48,23 @@ export interface EmployeePage {
   total_pages: number;
 }
 
+export interface SalaryHistoryEntry {
+  old_salary_minor: number;
+  new_salary_minor: number;
+  currency: string;
+  changed_at: string;
+  change_minor: number;
+  change_bp: number | null;
+}
+
+export interface SalaryHistoryResponse {
+  items: SalaryHistoryEntry[];
+}
+
+export type EmployeeInput = Omit<EmployeeOut, "id" | "salary_usd_minor" | "last_raise_date" | "manager_id"> & {
+  manager_id?: number | null;
+};
+
 export interface EmployeeQuery extends Record<string, EmployeeQueryValue> {
   page: number;
   page_size: number;

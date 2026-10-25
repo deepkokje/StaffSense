@@ -1,115 +1,133 @@
-# Salary Management Software: Architecture
+# StaffSense: Current Architecture
 
 **Author:** @Deep Kokje  
-**Last updated:** 24 Oct 2026  
-**Status:** Proposed design based on [plan.md](./plan.md) and [REQUIREMENTS.md](./REQUIREMENTS.md).
+**Last updated:** 25 Oct 2026
 
-## Overview
+This document describes the implemented system. See
+[REQUIREMENTS.md](./REQUIREMENTS.md) for current scope and
+[plan.md](./plan.md) for the delivered feature summary.
 
-A React web app gives one HR manager a salary directory, a pay snapshot and five headline insights for 10,000 employees. A FastAPI backend validates requests, coordinates database access and calculates insights. SQLite keeps local setup simple.
+## Stack
 
-This document describes the intended architecture, not an already implemented system.
+- Backend: Python 3.12, FastAPI, SQLAlchemy 2.x and SQLite.
+- Frontend: Vite, React, strict TypeScript, Ant Design, React Query and
+  react-router-dom. Recharts renders the dashboard cost pie.
+- Validation: pytest, Ruff, Vitest, Testing Library and the TypeScript compiler.
 
-## System diagram
+## Boundaries
 
 ```mermaid
 flowchart TD
-    HR[HR manager] --> UI[React + TypeScript + Ant Design]
-    UI -->|HTTP / JSON| API[FastAPI routers]
-    API --> Services[Application services]
-    Services --> Insights[Pure insight functions]
+    HR[HR manager] --> UI[React pages and Ant Design components]
+    UI --> Queries[React Query hooks and mutations]
+    Queries --> Client[Typed API client]
+    Client --> Routers[FastAPI routers and schemas]
+    Routers --> Services[Application services and pure calculations]
     Services --> Repositories[SQLAlchemy repositories]
-    Repositories --> Models[SQLAlchemy models]
+    Repositories --> Models[Typed SQLAlchemy models]
     Models --> DB[(SQLite)]
-    Seed[Deterministic seed script] --> Repositories
+    Seed[Deterministic seed generator and loader] --> DB
 ```
 
-## Components and boundaries
+Routers parse HTTP inputs and serialize outputs. Services enforce business rules
+and coordinate repository operations; pure calculation functions have no database
+or FastAPI dependencies. Repositories own application SQL and persistence.
+The seed loader separately populates the same model tables.
 
-| Component | Responsibility |
-| --- | --- |
-| Frontend | Dashboard, insight drill-downs, employee forms, filters, pagination and CSV download. Built with React, TypeScript, Vite and Ant Design. |
-| Routers | Validate HTTP inputs, call application services and translate results or errors into API responses. |
-| Application services | Coordinate repository reads and writes, invoke pure calculations and define transaction boundaries. |
-| Pure insight functions | Compute statistics, equity gaps, band compliance, peer outliers, benchmarks, FX normalization and what-if costs from supplied data. No database or HTTP access. |
-| Repositories | Own SQLAlchemy queries and persistence. Apply filters and pagination in the database rather than loading the entire directory for each page. |
-| Models | Define database tables, relationships and integrity constraints. |
-| Seed script | Generate repeatable demo data and persist it through repositories using the same model constraints as the app. |
-
-Only repositories access SQLite. Application services may perform I/O through repositories; the calculation functions they call remain pure and independently testable.
+Frontend components do not fetch data directly. Typed API functions are called
+by React Query hooks and mutations. Shared query keys support invalidation after
+employee writes. The dashboard reuses the existing insight hooks rather than
+adding an endpoint or duplicating requests.
 
 ## Data model
 
-The following entities support the planned features:
-
-| Entity | Key data and constraints |
+| Entity | Stored data |
 | --- | --- |
-| Employee | ID, unique email, name, gender, department, title, level, country, base salary in local minor units and currency code. Hire date and an optional manager reference support stretch insights. |
-| Salary band | Title, level, country, currency, minimum, midpoint and maximum in minor units. One band per peer group, with minimum <= midpoint <= maximum. |
-| Salary history | Employee reference, old salary, new salary, associated currency and change date. Created in the same transaction as a salary change. |
-| Fixed FX rate | Currency code and a configurable conversion rate to USD. Fixed inputs make the demo and tests reproducible. |
+| Employee | Identity, unique email, role, level, department, country, local currency and salary, denormalized USD salary, gender, manager, employment type, hire date, last raise date and status. |
+| SalaryBand | Title, level, country, currency and ordered minimum/midpoint/maximum salaries. Unique per title, level and country. |
+| SalaryHistory | Employee reference, old/new local salaries, currency and timestamp. |
+| FxRate | Currency key and positive integer usd_rate_e6. |
 
-Reject negative salaries, unsupported currencies and duplicate emails. A salary must use the same currency as its applicable band before local comparisons are made.
+Models use SQLAlchemy typed mappings, foreign keys, check constraints and indexes
+for common employee filters and peer-group queries.
 
-### Money and grouping
+## Money and statistics
 
-- Store salaries as integer minor units plus a currency code, never binary floating-point amounts.
-- Use decimal arithmetic for FX rates and percentage calculations, with an explicit, tested rounding rule when converting back to minor units.
-- Derive USD-normalized amounts for cross-country totals and comparisons; retain local amounts as the source of truth.
-- Define a peer group by title + level + country.
-- Return an explicit "insufficient data" result for peer-group statistics with fewer than five people. Do not substitute zero for an unavailable statistic.
+- Store money and FX rates as integers, never floating-point or SQLite
+  Numeric/Decimal columns.
+- The pure money module owns supported currency exponents and Decimal-based FX
+  conversion with half-even rounding.
+- Statistical interpolation, ratios, raise costs and percentage changes use
+  integer arithmetic and the shared half-even division helper.
+- A peer group is title + level + country. Benchmark and outlier statistics
+  require at least five eligible employees.
+- Missing FX rates and incompatible currencies produce errors rather than
+  fabricated monetary values.
 
-## Request flows
+## Employee writes and salary history
 
-### Dashboard and insights
+1. Validate the input schema, employee, unique email, manager chain and FX rate.
+2. Reject updates that change currency.
+3. Recompute USD salary using the money module.
+4. On an actual salary change, build a signed change using an injected UTC clock
+   and insert a history row. A raise updates last_raise_date; a cut preserves it.
+5. Commit the employee and history together through the repository transaction,
+   or roll both back on failure.
+6. Return the employee and invalidate affected frontend query caches.
 
-1. The frontend requests the pay snapshot and headline insights.
-2. Routers validate filters and pass them to application services.
-3. Repositories fetch the required employee, band and FX data.
-4. Pure functions group records and calculate results.
-5. Services return results with eligibility or insufficient-data status.
-6. The frontend renders summaries and links to the relevant drill-downs.
+Creating an employee starts without history. Deleting checks direct reports,
+then removes history and the employee in one transaction. History retrieval
+checks employee existence and orders rows by changed_at descending, then ID
+descending. Seeded and newly recorded rows use the same change calculations.
+SQLite retains the existing offset-free datetime representation; stored history
+timestamps are treated as UTC.
 
-### Employee salary update
+## Implemented HTTP surfaces
 
-1. Validate the employee, salary and currency.
-2. Read the existing salary through a repository.
-3. Update the employee and insert salary history in one transaction if the salary changed.
-4. Commit both writes together, or roll back both on failure.
-5. Return the saved employee and refresh affected views.
+| Surface | Endpoints |
+| --- | --- |
+| Health | GET /health |
+| Directory | GET /employees, GET /employees/{id} |
+| Employee writes | POST /employees, PUT /employees/{id}, DELETE /employees/{id} |
+| History | GET /employees/{id}/salary-history |
+| Benchmarks | GET /insights/benchmarks |
+| Attention | GET /insights/bands, GET /insights/outliers |
+| What-if | GET /insights/what-if/bring-to-band-min, GET /insights/what-if/raise |
 
-### Directory and CSV export
-
-The directory uses server-side filtering and pagination. CSV export applies the same filters but exports the complete filtered result, not only the visible page.
-
-## Insight calculations
+## Insight behavior
 
 | Insight | Calculation |
 | --- | --- |
-| Pay equity | Raw gap = (median male - median female) / median male, using USD-normalized pay for cross-country views. Adjusted gap is the group-size-weighted average of this gap across eligible peer groups with both genders. |
-| Band compliance | Compare local salary with band minimum and maximum. Compa-ratio = salary / band midpoint. Salaries exactly on a boundary are in band. |
-| Peer outliers | Deviation = (salary - peer median) / peer median. Flag deviations strictly beyond -20% or +20% in eligible peer groups. |
-| Benchmarks | Compute min, p25, median, p75 and max in Python from salaries grouped by title, level and country. |
-| What-if cost | Sum positive shortfalls to band minimum after USD conversion, or calculate X% of the chosen department's USD payroll. Scenarios are read-only and do not change salaries. |
-| Pay snapshot | Headcount, payroll and distributions by country, department and level; use USD for totals across currencies. |
+| Benchmarks | Local-currency min, p25, median, p75 and max per peer group, with explicit insufficient-data results. |
+| Band compliance | Inclusive local salary boundaries; integer per-mille compa-ratio and band-gap amounts. Missing bands have a separate summary count. |
+| Outliers | Signed deviation from peer median in integer per-mille; rounded absolute deviations strictly above 200 are flagged. |
+| Band-minimum cost | Sum positive local shortfalls per country, then convert each country total to USD once. Employees without bands are skipped. |
+| Department raise cost | Round each local raise from integer basis points, sum per country, then convert once per country. New USD payroll equals current payroll plus total cost. |
 
-Empty inputs, missing bands, missing FX rates and zero denominators must produce explicit unavailable-data or validation results, not fabricated values. The percentile interpolation method and monetary rounding policy must be fixed and tested before implementation.
+All insights use ACTIVE and ON_LEAVE employees. Directory queries use server-side
+filtering, sorting and pagination; insight repositories retrieve the inputs needed
+for pure calculations.
 
-Compression and inversion, pay progression and geographic comparison remain stretch features. They can reuse peer grouping, salary history and normalization without changing the core layering.
+## Frontend surfaces
 
-## Performance and validation
+- `/`: four-card dashboard with band/outlier bar graphs, country-cost pie and
+  detail links.
+- `/employees`: filters and employee table, create/edit form drawer, confirmed
+  deletion and salary-history drawer.
+- `/insights/benchmarks`: peer-group filters and benchmark table.
+- `/insights/attention`: band compliance and outlier tabs, URL-selected tab,
+  filters and server pagination.
+- `/insights/what-if`: automatic band-minimum estimate and submitted department
+  raise calculator.
 
-- Target directory responses under 300 ms and each insight under 500 ms at 10,000 employees.
-- Record query timings and total request timings so database performance is not confused with end-to-end response time.
-- Avoid per-employee queries; fetch insight inputs in bounded queries and calculate statistics in memory.
-- Add indexes for directory filters and peer-group lookups based on measured queries.
-- Use pytest for pure calculations, validation, repository behavior and atomic salary-history updates.
-- Use Vitest for frontend filtering, pagination and loading, error and insufficient-data states.
-- Seed exactly 10,000 employees deterministically, including a planted equity gap, out-of-band salaries and compression cases.
-- Verify that the seeded demo produces a visible gap, out-of-band employees and a non-zero remediation cost.
+Each surface handles relevant loading, error, retry and empty states.
+Salary and percentage input parsing uses string operations to produce integers.
+Display helpers format API values without recomputing business calculations.
 
-## Scope and deployment boundary
+## Validation
 
-The initial design excludes authentication, RBAC, payroll, tax, bonuses, equity, live FX, Excel import and approval workflows. It is a local demo design, not a production-ready deployment for sensitive salary data. Authentication and authorization are required before production use.
-
-Repositories isolate persistence details to make a later PostgreSQL migration easier, but that migration still requires schema, transaction and query validation.
+Backend tests cover pure calculations, database integrity, validation, API shapes
+and transaction rollback. Frontend tests use mocked APIs without network access
+and cover forms, navigation, formatting and cache refresh. The production build
+includes strict TypeScript checking. An isolated benchmark script times current
+insight endpoints against 10,000 seeded employees without enforcing timings in CI.

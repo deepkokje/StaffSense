@@ -1,54 +1,70 @@
-# Salary Management Software: Plan
-**Author:** @Deep Kokje · **Reviewer:** Incubyte team · **Last updated:** 24 Oct 2026
+# StaffSense: Delivered Feature Summary
 
-## Overview
-ACME's HR team manages salaries for 10,000 employees across countries in Excel. This design replaces that with a web app whose first screen answers five questions: is there a gender pay gap, who is paid outside their band, who deviates from their peers, what is the going rate for a role, and what would it cost to fix it.
+**Author:** @Deep Kokje  
+**Last updated:** 25 Oct 2026
 
-The backend is FastAPI with SQLite and the UI is React with Ant Design. Insight logic is pure functions over peer groups (title + level + country), so each one is unit-testable without a database.
+This document records completed work only. Current requirements are in
+[REQUIREMENTS.md](./REQUIREMENTS.md); implementation boundaries are in
+[arch.md](./arch.md).
 
-A deterministic seed script creates 10,000 employees with planted patterns, so the demo shows real findings instead of an empty dashboard.
+## Delivered foundation
 
-## Context
-Excel cannot answer "how do we pay people?" reliably at this size. Salaries sit in many currencies, peers must be grouped by title, level and country, and bands and gender live in separate sheets. Each question means rebuilding pivot tables by hand, and two people get two answers. This project is the first step to one trusted source of pay data. The Requirements tab has the scope; this tab covers how to build it.
+- Integer-minor-unit money with supported currency exponents, integer fixed FX
+  rates and half-even conversion.
+- Typed SQLAlchemy Employee, SalaryBand, SalaryHistory and FxRate models, shared
+  metadata, engine and session dependency.
+- Deterministic demo generation and loading for 10,000 employees, including
+  salary bands, FX rates and historical raises.
 
-## Goals and Non-Goals
-**Goals**
+## Delivered backend
 
-- Directory loads in under 300 ms and each insight in under 500 ms at 10,000 rows, checked with query timing logs.
-- All five headline insights return correct results and are covered by unit tests, including small and empty groups.
-- The seeded demo shows an equity gap, out-of-band people and a non-zero what-if cost.
-**Non-goals:** auth and RBAC, payroll, tax, bonuses and equity, live FX rates, Excel import, and approval workflows. The Requirements tab gives the reason for each.
-
-## How we plan to solve it
-**Stack:** FastAPI + SQLAlchemy + SQLite, React + TypeScript (Vite) + Ant Design, pytest, Vitest. SQLite keeps setup trivial, and the repository layer lets you swap in Postgres later.
-
-The browser talks to FastAPI routers. Routers call services, where all insight logic lives as pure functions. Services read through repositories, which are the only code that touches SQLite. The seed script writes the same tables.
-
-[embed: node/1f24e5b3-ebb0]
-Only repositories touch SQLite, so services stay pure and testable. The seed script writes the same tables.
-
-In use, the HR manager opens the dashboard and sees the raw and adjusted gap side by side, clicks into the peer groups driving it, opens the outlier list, and runs the what-if cost to see what fixing it would take.
-
-
-### How we will compute each insight
-
-| Insight | Method |
+| Feature | Result |
 | --- | --- |
-| Pay equity | Raw gap = (median male − median female) ÷ median male. Adjusted gap = average of the same gap inside each peer group with both genders and at least 5 people, weighted by group size. |
-| Band compliance | Compa-ratio = salary ÷ band midpoint. Below min or above max is flagged. |
-| Outliers | % deviation from peer-group median; flag beyond ±20%. |
-| Benchmarks | min, p25, median, p75, max per peer group. SQLite has no median, so group salaries in SQL and compute percentiles in Python (fast at 10k rows). |
-| What-if cost | Sum of (band min − salary) for everyone below min, in USD; or X% × payroll for a chosen department. |
-| Compression, progression, geo | Tenure vs. pay in a peer group; months since last raise; median per title and level indexed to a base country. |
+| Employee directory | Search, filters, server sorting and pagination, plus individual employee retrieval. |
+| Employee writes | Create, full editable-field replacement and hard delete with shared domain-error mapping and atomic transactions. |
+| Validation | Case-insensitive email uniqueness, supported currency and FX lookup, manager existence, cycle prevention, currency-change rejection and direct-report deletion protection. |
+| Salary history | Actual salary changes recorded with an injected clock in the employee transaction; raise-date rules, signed integer changes, half-even basis points and newest-first retrieval. |
+| Benchmarks | Shared peer grouping, interpolated percentiles and insufficient-data handling. |
+| Band compliance | Summary counts, boundary classification, ratios, filtering and pagination. |
+| Peer outliers | Median-based deviation, minimum group size, direction filtering and pagination. |
+| What-if | Read-only band-minimum and department-raise cost reports, local aggregation and country-level USD conversion. |
+| Performance check | Script that seeds an isolated temporary database and times the current insight endpoints. |
 
-## Testing approach
-**Tests worth writing:**
+## Delivered frontend
 
-- Percentiles and median: empty, single-value, even-count groups.
-- Equity: no gap, planted gap, group with one gender only, group under 5.
-- Bands: below min, above max, exactly on the boundary.
-- Outliers: threshold edges and groups under 5.
-- What-if: zero cost when everyone is in band; correct currency conversion.
-- FX normalization and rounding.
-- CRUD validation (negative salary, unknown currency, duplicate email) and salary-history creation on update.
-- Filter and pagination combinations; seed determinism (same seed, 10,000 rows).
+- Dashboard at `/` with four cards: Below band, Above band, Outliers and Cost to
+  reach band minimum. Accessible bar graphs and a Recharts cost pie retain exact
+  value labels and link to detail pages.
+- Employee directory with search, filters, sorting and pagination.
+- Add/edit form drawer with currency-aware integer salary parsing, date selection,
+  preserved values on failure and field-level duplicate-email errors.
+- Confirmed deletion with clear conflict messages.
+- Salary-history drawer with dated old/new salaries, signed amounts, green raise
+  and red cut tags, percentages and an undefined-percentage label for zero bases.
+- Benchmark page, Needs attention tabs and What-if calculators.
+- Shared React Query keys and mutation invalidation for current employee,
+  insight and salary-history data. Dashboard cards reuse insight queries.
+- Loading, empty, error and retry states for data views.
+
+## Verification completed
+
+- Backend tests cover money conversion, half-even statistics, model constraints,
+  repository filters, CRUD validation, management cycles, history ordering,
+  atomic rollback, API responses and seeded-data integration.
+- Frontend tests cover integer parsing and formatting, navigation, insight
+  rendering, forms, confirmed deletion, salary-history states and refresh after
+  employee edits.
+- pytest and Ruff pass; Vitest and the strict TypeScript production build pass.
+- Seeded-browser checks confirmed employee create/edit/delete, duplicate-email
+  feedback and refreshed attention/dashboard counts.
+- Seeded-browser checks confirmed an existing historical raise, a newly recorded
+  salary change and no additional history from a name-only edit.
+
+## Current behavior to preserve
+
+- No floating-point monetary or percentage business calculations.
+- Application layering remains routers -> services -> repositories -> models.
+- Pure calculation functions remain independent of database and HTTP code.
+- Employee updates and their salary-history inserts commit or roll back together.
+- Eligible insight data includes ACTIVE and ON_LEAVE employees only.
+- What-if scenarios do not modify employee salaries.
